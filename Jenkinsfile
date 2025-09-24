@@ -19,6 +19,7 @@ pipeline {
             steps {
                 sh '''
                     . venv/bin/activate
+                    export PYTHONPATH=$PYTHONPATH:$(pwd)
                     echo "Running tests from project root..."
                     pytest --maxfail=1 --disable-warnings -v
                 '''
