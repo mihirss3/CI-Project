@@ -21,7 +21,7 @@ pipeline {
                     . venv/bin/activate
                     export PYTHONPATH=$PYTHONPATH:$(pwd)
                     echo "Running tests from project root..."
-                    pytest --maxfail=1 --disable-warnings -v
+                    pytest --maxfail=1 --disable-warnings -v --junitxml=test-results.xml
                 '''
             }
         }
