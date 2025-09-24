@@ -17,7 +17,11 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                sh '. venv/bin/activate && pytest tests/'
+                sh '''
+                    . venv/bin/activate
+                    echo "Running tests from project root..."
+                    pytest --maxfail=1 --disable-warnings -v
+                '''
             }
         }
     }
