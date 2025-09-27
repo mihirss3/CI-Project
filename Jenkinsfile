@@ -34,13 +34,6 @@ pipeline {
             }
         }
 
-        stage('Build') {
-            steps {
-                timeout(time: 3, unit: 'MINUTES') {
-                    sh './build.sh'
-                }
-            }
-        }
     }
 
     post {
