@@ -11,10 +11,14 @@ pipeline {
         stage('Setup Python') {
             steps {
                 sh '''
+                  # start fresh so ownership is correct
+                  rm -rf venv
                   python3 -m venv venv
                   . venv/bin/activate
+
+                  # force install into the venv, never into ~/.local
                   pip install --upgrade pip
-                  pip install -r requirements.txt
+                  pip install --no-user -r requirements.txt
                 '''
             }
         }
@@ -22,10 +26,10 @@ pipeline {
         stage('Run Tests') {
             steps {
                 sh '''
-                    . venv/bin/activate
-                    export PYTHONPATH=$PYTHONPATH:$(pwd)
-                    echo "Running tests from project root..."
-                    pytest --maxfail=1 --disable-warnings -v --junitxml=test-results.xml
+                  . venv/bin/activate
+                  export PYTHONPATH=$PYTHONPATH:$(pwd)
+                  echo "Running tests from project root..."
+                  pytest --maxfail=1 --disable-warnings -v --junitxml=test-results.xml
                 '''
             }
         }
@@ -41,7 +45,7 @@ pipeline {
 
     post {
         always {
-            junit '**/test-results.xml' // optional, for test reporting
+            junit '**/test-results.xml'
         }
     }
 }
