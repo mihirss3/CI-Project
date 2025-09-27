@@ -10,8 +10,12 @@ pipeline {
 
         stage('Setup Python') {
             steps {
-                sh 'python3 -m venv venv'
-                sh '. venv/bin/activate && pip install -r requirements.txt'
+                sh '''
+                  python3 -m venv venv
+                  . venv/bin/activate
+                  pip install --upgrade pip
+                  pip install -r requirements.txt
+                '''
             }
         }
 
@@ -23,6 +27,14 @@ pipeline {
                     echo "Running tests from project root..."
                     pytest --maxfail=1 --disable-warnings -v --junitxml=test-results.xml
                 '''
+            }
+        }
+
+        stage('Build') {
+            steps {
+                timeout(time: 3, unit: 'MINUTES') {
+                    sh './build.sh'
+                }
             }
         }
     }
