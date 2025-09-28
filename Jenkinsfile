@@ -1,7 +1,7 @@
 pipeline {
     agent any
     options {
-        skipDefaultCheckout()  // we will checkout only if approved
+        skipDefaultCheckout()  // we will checkout only if approved 
     }
     stages {
         stage('Gate on Review') {
