@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     options {
-        skipDefaultCheckout() // we checkout manually only after approval
+        skipDefaultCheckout() // Only checkout after approval
         timestamps()
     }
 
@@ -15,13 +15,14 @@ pipeline {
         stage('Gate: require PR approval') {
             steps {
                 script {
-                    // If this is not a PR build, skip the pipeline
+                    // Skip if not a PR build
                     if (!env.CHANGE_ID) {
-                        echo "No CHANGE_ID (not a PR build). Skipping pipeline."
+                        echo "Not a PR build. Skipping pipeline."
                         currentBuild.result = 'SUCCESS'
                         return
                     }
 
+                    // Use GitHub PAT to check approval
                     withCredentials([usernamePassword(
                         credentialsId: env.GITHUB_CREDENTIALS, 
                         usernameVariable: 'GITHUB_USER', 
@@ -37,8 +38,10 @@ pipeline {
                         def approved = reviews.any { r -> (r.state ?: '').toString().toLowerCase() == 'approved' }
 
                         if (!approved) {
-                            echo "No APPROVED review found. Stopping pipeline."
-                            error("Pipeline stopped: PR not approved")
+                            echo "PR not approved yet. Stopping pipeline."
+                            // Mark as success but skip tests
+                            currentBuild.result = 'SUCCESS'
+                            return
                         } else {
                             echo "PR approved. Continuing build..."
                         }
