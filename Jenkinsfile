@@ -4,18 +4,28 @@ pipeline {
         skipDefaultCheckout()  // we will checkout only if approved 
     }
     stages {
-        stage('Gate on Review') {
+        stage('Check Approval') {
             steps {
                 script {
-                    def action = env.GITHUB_EVENT_NAME
-                    if (action != 'pull_request_review') {
-                        error "Not a PR review event. Skipping build."
+                    // Always print env once to verify variables
+                    sh 'env | sort'
+
+                    // Use GitHub API to check approval
+                    def token = credentials('github-token-id')   // store a PAT in Jenkins creds
+                    def prNumber = env.CHANGE_ID
+                    def repo   = "mihirss3/CI-Project"
+                    def response = sh(
+                        script: "curl -s -H 'Authorization: token ${token}' https://api.github.com/repos/${repo}/pulls/${prNumber}/reviews",
+                        returnStdout: true
+                    )
+                    def reviews = readJSON text: response
+                    def approved = reviews.any { it.state == 'APPROVED' }
+
+                    if (!approved) {
+                        echo "No approval yet. Stopping pipeline."
+                        currentBuild.result = 'SUCCESS'
+                        return
                     }
-                    def payload = readJSON text: env.GITHUB_EVENT_PAYLOAD
-                    if (payload.review.state != 'approved') {
-                        error "PR review is not approved. Skipping build."
-                    }
-                    echo "PR approved – proceeding with build."
                 }
             }
         }
