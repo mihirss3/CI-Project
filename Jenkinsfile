@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     options {
-        skipDefaultCheckout() // Only checkout after approval
+        skipDefaultCheckout()
         timestamps()
     }
 
@@ -15,14 +15,14 @@ pipeline {
         stage('Gate: require PR approval') {
             steps {
                 script {
-                    // Skip if not a PR build
+                    // Only for PR builds
                     if (!env.CHANGE_ID) {
                         echo "Not a PR build. Skipping pipeline."
-                        currentBuild.result = 'SUCCESS'
-                        return
+                        // Stop completely
+                        error("Not a PR build")
                     }
 
-                    // Use GitHub PAT to check approval
+                    // Check GitHub reviews for approval
                     withCredentials([usernamePassword(
                         credentialsId: env.GITHUB_CREDENTIALS, 
                         usernameVariable: 'GITHUB_USER', 
@@ -38,10 +38,8 @@ pipeline {
                         def approved = reviews.any { r -> (r.state ?: '').toString().toLowerCase() == 'approved' }
 
                         if (!approved) {
-                            echo "PR not approved yet. Stopping pipeline."
-                            // Mark as success but skip tests
-                            currentBuild.result = 'SUCCESS'
-                            return
+                            echo "PR not approved yet. Pipeline will not run."
+                            error("Pipeline stopped: PR not approved")
                         } else {
                             echo "PR approved. Continuing build..."
                         }
@@ -53,10 +51,10 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout([
-                    $class: 'GitSCM', 
-                    branches: [[name: env.CHANGE_BRANCH ?: 'main']], 
+                    $class: 'GitSCM',
+                    branches: [[name: env.CHANGE_BRANCH ?: 'main']],
                     doGenerateSubmoduleConfigurations: false,
-                    extensions: [], 
+                    extensions: [],
                     userRemoteConfigs: [[
                         url: "https://github.com/${env.REPO}.git",
                         credentialsId: env.GITHUB_CREDENTIALS
