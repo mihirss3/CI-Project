@@ -7,10 +7,22 @@ pipeline {
         stage('Check Approval') {
             steps {
                 script {
-                    // GitHub sets this only for pull_request_review events
-                    def reviewState = env.GITHUB_REVIEW_STATE ?: ''
-                    if (reviewState.toLowerCase() != 'approved') {
-                        echo "PR is not approved. Skipping build."
+                    // Always print env once to verify variables
+                    sh 'env | sort'
+
+                    // Use GitHub API to check approval
+                    def token = credentials('github-token-id')   // store a PAT in Jenkins creds
+                    def prNumber = env.CHANGE_ID
+                    def repo   = "mihirss3/CI-Project"
+                    def response = sh(
+                        script: "curl -s -H 'Authorization: token ${token}' https://api.github.com/repos/${repo}/pulls/${prNumber}/reviews",
+                        returnStdout: true
+                    )
+                    def reviews = readJSON text: response
+                    def approved = reviews.any { it.state == 'APPROVED' }
+
+                    if (!approved) {
+                        echo "No approval yet. Stopping pipeline."
                         currentBuild.result = 'SUCCESS'
                         return
                     }
