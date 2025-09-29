@@ -4,18 +4,16 @@ pipeline {
         skipDefaultCheckout()  // we will checkout only if approved 
     }
     stages {
-        stage('Gate on Review') {
+        stage('Check Approval') {
             steps {
                 script {
-                    def action = env.GITHUB_EVENT_NAME
-                    if (action != 'pull_request_review') {
-                        error "Not a PR review event. Skipping build."
+                    // GitHub sets this only for pull_request_review events
+                    def reviewState = env.GITHUB_REVIEW_STATE ?: ''
+                    if (reviewState.toLowerCase() != 'approved') {
+                        echo "PR is not approved. Skipping build."
+                        currentBuild.result = 'SUCCESS'
+                        return
                     }
-                    def payload = readJSON text: env.GITHUB_EVENT_PAYLOAD
-                    if (payload.review.state != 'approved') {
-                        error "PR review is not approved. Skipping build."
-                    }
-                    echo "PR approved – proceeding with build."
                 }
             }
         }
