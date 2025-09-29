@@ -1,51 +1,62 @@
 pipeline {
     agent any
+
+    // We skip the default checkout until we know the PR is approved
     options {
-        skipDefaultCheckout()  // we will checkout only if approved 
+        skipDefaultCheckout()
     }
+
     stages {
+
         stage('Check Approval') {
             steps {
-                script {
-                    // Always print env once to verify variables
-                    sh 'env | sort'
+                // Expose the GitHub token as an env var for curl
+                withCredentials([string(credentialsId: 'github-token-id', variable: 'GITHUB_TOKEN')]) {
+                    script {
+                        // Sanity check that we’re running inside a PR context
+                        if (!env.CHANGE_ID) {
+                            error "CHANGE_ID is not set – this must be a pull-request build."
+                        }
 
-                    // Use GitHub API to check approval
-                    def token = credentials('github-token-id')   // store a PAT in Jenkins creds
-                    def prNumber = env.CHANGE_ID
-                    def repo   = "mihirss3/CI-Project"
-                    def response = sh(
-                        script: "curl -s -H 'Authorization: token ${token}' https://api.github.com/repos/${repo}/pulls/${prNumber}/reviews",
-                        returnStdout: true
-                    )
-                    def reviews = readJSON text: response
-                    def approved = reviews.any { it.state == 'APPROVED' }
+                        echo "Checking approval for PR #${env.CHANGE_ID}"
 
-                    if (!approved) {
-                        echo "No approval yet. Stopping pipeline."
-                        currentBuild.result = 'SUCCESS'
-                        return
+                        // Query GitHub reviews for this PR
+                        def apiUrl = "https://api.github.com/repos/mihirss3/CI-Project/pulls/${env.CHANGE_ID}/reviews"
+                        def json = sh(
+                            script: "curl -s -H 'Authorization: token ${GITHUB_TOKEN}' ${apiUrl}",
+                            returnStdout: true
+                        ).trim()
+
+                        def reviews = readJSON text: json
+                        def approved = reviews.any { it.state == 'APPROVED' }
+
+                        if (!approved) {
+                            echo "No GitHub approval yet. Stopping pipeline."
+                            currentBuild.result = 'SUCCESS'
+                            // End the build early without marking it as failure
+                            error("PR not approved")
+                        }
                     }
                 }
             }
         }
+
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/mihirss3/CI-Project.git', branch: 'main'
+                // In a multibranch job, this checks out the correct
+                // merge commit or PR head automatically.
+                checkout scm
             }
         }
 
         stage('Setup Python') {
             steps {
                 sh '''
-                  # start fresh so ownership is correct
-                  rm -rf venv
-                  python3 -m venv venv
-                  . venv/bin/activate
-
-                  # force install into the venv, never into ~/.local
-                  pip install --upgrade pip
-                  pip install --no-user -r requirements.txt
+                    rm -rf venv
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    pip install --upgrade pip
+                    pip install --no-user -r requirements.txt
                 '''
             }
         }
@@ -53,13 +64,12 @@ pipeline {
         stage('Run Tests') {
             steps {
                 sh '''
-                  . venv/bin/activate
-                  export PYTHONPATH=$PYTHONPATH:$(pwd)
-                  echo "Running tests from project root..."
-                  pytest --maxfail=1 --disable-warnings -v --junitxml=test-results.xml
+                    . venv/bin/activate
+                    export PYTHONPATH=$PYTHONPATH:$(pwd)
+                    echo "Running tests..."
+                    pytest --maxfail=1 --disable-warnings -v --junitxml=test-results.xml
                 '''
             }
         }
-
     }
 }
